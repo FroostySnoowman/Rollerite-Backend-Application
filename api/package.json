@@ -1,0 +1,14 @@
+{
+  "name": "rollerite-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:apply:local": "wrangler d1 migrations apply rollerite_todos --local",
+    "db:apply:remote": "wrangler d1 migrations apply rollerite_todos --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.28.0"
+  }
+}

@@ -1,0 +1,54 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Local reference tree (not part of this app’s source contract)
+reference/
+
+# Dependencies
+node_modules/
+
+# Production / dev build output
+dist/
+build/
+out/
+
+# Vite & TypeScript caches
+.vite/
+*.tsbuildinfo
+
+# Environment & local secrets
+# Ignore real env files; keep *.example tracked for documentation.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Cloudflare Wrangler (local D1/KV state, dev secrets)
+.wrangler/
+.dev.vars
+
+# Logs & package manager noise
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Monorepo / tool caches
+.turbo/
+.eslintcache
+**/.tmp/
+
+# Test coverage (if you add a runner later)
+coverage/
+*.lcov
+
+# Editor / swap (optional; remove if you prefer committing these)
+.idea/
+*.swp
+*.swo
+*~
+
+# Accidental key dumps
+*.pem

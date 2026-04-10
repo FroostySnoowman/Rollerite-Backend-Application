@@ -1,0 +1,14 @@
+name = "rollerite-todos-api"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# D1 migrations live in /db/migrations (repo root). `binding` must stay `DB` (used in src/index.js as env.DB).
+[[d1_databases]]
+binding = "DB"
+database_name = "rollerite_todos"
+database_id = "8a8dff32-9b33-4360-b7c7-1e26528afc98"
+migrations_dir = "../db/migrations"
+
+[vars]
+# Comma-separated allowed browser origins for CORS (no spaces). Used when the frontend is not same-origin.
+FRONTEND_ORIGIN = "http://localhost:5173"

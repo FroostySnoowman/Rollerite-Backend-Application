@@ -11,4 +11,4 @@ migrations_dir = "../db/migrations"
 
 [vars]
 # Comma-separated allowed browser origins for CORS (no spaces). Used when the frontend is not same-origin.
-FRONTEND_ORIGIN = "http://localhost:5173"
+FRONTEND_ORIGIN = "http://localhost:5173,https://rollerite-backend-application.pages.dev"

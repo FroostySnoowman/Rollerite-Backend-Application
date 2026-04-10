@@ -64,7 +64,7 @@ export default function TodoPage() {
               Tasks
             </h1>
             <p className="mt-2 max-w-xl text-[var(--fg-muted)]">
-              Add, edit, or remove items. Data is stored in D1 via the Worker API.
+              Add, edit, or remove items.
             </p>
           </header>
 

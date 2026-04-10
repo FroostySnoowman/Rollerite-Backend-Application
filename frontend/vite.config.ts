@@ -1,16 +1,13 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode }) => {
-  const fromFiles = loadEnv(mode, process.cwd(), '')
-  const base = (process.env.VITE_API_URL ?? fromFiles.VITE_API_URL)?.trim()
-
-  if (command === 'build' && !base) {
+export default defineConfig(({ command }) => {
+  if (command === 'build' && !process.env.VITE_API_URL?.trim()) {
     throw new Error(
-      'VITE_API_URL is required for `vite build`. Use a Cloudflare Pages build Secret named VITE_API_URL, ' +
-        'or add frontend/.env.production (gitignored) with: VITE_API_URL=https://<your-worker>.workers.dev — no trailing slash. Do not pass it on the shell.',
+      'VITE_API_URL must be set in the build environment (e.g. Cloudflare Pages → Secrets for the build step). ' +
+        'Use your Worker origin only, no trailing slash.',
     )
   }
 

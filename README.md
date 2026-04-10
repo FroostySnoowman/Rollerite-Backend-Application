@@ -1,158 +1,81 @@
 # Rollerite Todos
 
-Full-stack todo list: **React + TypeScript + Vite** frontend (UI aligned with [`reference/`](reference/)), **Cloudflare Worker** (JavaScript + Wrangler) API under **`/api/`**, and **D1** SQL migrations under **`/db/migrations/`**.
+React (TypeScript) + Vite frontend, Cloudflare Worker API in **`api/`**, D1 migrations in **`db/migrations/`**. UI takes cues from [`reference/`](reference/) (tokens, typography) without copying its full layout.
 
 ## Features
 
-- Add, edit, and remove todos; each row has **Edit**, **Save** / **Cancel**, and **Remove** actions.
-- Light / dark theme toggle (same token system as the reference app).
-- **Home** landing (reference-inspired typography and colors, not a layout copy) and a **Tasks** page for the list.
-- REST API: `GET/POST /api/todos`, `PATCH/DELETE /api/todos/:id`.
+- Todos: add, edit, remove; per-row actions.
+- Light / dark theme.
+- Routes: **Home** (`/`) and **Tasks** (`/tasks`).
+- API: `GET/POST /api/todos`, `PATCH/DELETE /api/todos/:id`.
 
 ## Prerequisites
 
-- **Node.js** 20.19+, 22.12+, or another [supported Vite 5](https://vite.dev/guide/#scaffolding-your-first-vite-project) version (Node 21 works with the pinned Vite 5 stack in this repo).
-- **npm** (or use your preferred package manager consistently).
-- A **Cloudflare account** (free tier is enough) when you deploy the Worker and remote D1.
+- Node.js compatible with Vite 5 (see [Vite docs](https://vite.dev/guide/#scaffolding-your-first-vite-project)).
+- npm.
+- Cloudflare account for Worker + D1 + (optional) Pages.
 
 ---
 
-## Cloudflare: full API setup
+## Cloudflare setup
 
-These steps assume the Worker lives in [`api/`](api/) and D1 migration **files** live in [`db/migrations/`](db/migrations/). [`api/wrangler.toml`](api/wrangler.toml) sets `migrations_dir = "../db/migrations"` so Wrangler always applies SQL from the **`db`** folder.
+### Worker + D1
 
-### 1. Install Wrangler and log in
+1. **Wrangler:** `wrangler login` (global or `npx` from `api/`).
 
-From anywhere (or from `api/` after `npm install`):
+2. **Install API deps:** `cd api && npm install`
 
-```bash
-npm install -g wrangler
-# or use: npx wrangler ...
-wrangler login
-```
+3. **Create D1** (name must match `database_name` in [`api/wrangler.toml`](api/wrangler.toml), default `rollerite_todos`):
 
-`wrangler login` opens a browser flow and stores credentials for the CLI. You need this before `d1 create`, `migrations apply --remote`, or `deploy`.
+   ```bash
+   cd api
+   npx wrangler d1 create rollerite_todos
+   ```
 
-### 2. Install API dependencies
+   Put the printed **`database_id`** into `wrangler.toml` under `[[d1_databases]]`. Keep **`binding = "DB"`** (used in code).
 
-```bash
-cd api
-npm install
-```
+4. **Migrations** live in [`db/migrations/`](db/migrations/) (`migrations_dir` in `wrangler.toml` points there).
 
-### 3. Create the D1 database (remote)
+   ```bash
+   cd api
+   npm run db:apply:local    # Miniflare / wrangler dev
+   npm run db:apply:remote   # hosted D1
+   ```
 
-Pick a name that matches **`database_name`** in `wrangler.toml` (default: **`rollerite_todos`**), or change both to match your name.
+   New SQL: add files under `db/migrations/` or `npx wrangler d1 migrations create rollerite_todos "message"`.
 
-```bash
-cd api
-npx wrangler d1 create rollerite_todos
-```
+5. **Deploy Worker:** `cd api && npm run deploy` — first run creates the Worker. Note the **`*.workers.dev`** URL.
 
-Wrangler prints a **database id** (UUID). Copy it into [`api/wrangler.toml`](api/wrangler.toml):
+### CORS (`FRONTEND_ORIGIN`)
 
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "rollerite_todos"
-database_id = "<paste-your-database-id-here>"
-migrations_dir = "../db/migrations"
-```
+Browsers call the Worker on its own origin, so the Worker must allow your app’s origin. Set in [`api/wrangler.toml`](api/wrangler.toml) `[vars]` or in the dashboard (Worker → **Variables**), e.g.:
 
-- **`binding`**: must stay **`DB`** unless you change the Worker code (`env.DB`).
-- **`database_name`**: must match the name you passed to `wrangler d1 create` and to `wrangler d1 migrations apply <name>`.
-- **`migrations_dir`**: relative to the **`api/`** directory (points at repo-root **`db/migrations`**).
+`https://<your-pages>.pages.dev,http://localhost:5173`
 
-Local dev can keep the placeholder `00000000-...` id for **local** SQLite only; **production** must use the real id from `d1 create` (or `wrangler d1 list`).
+(comma-separated, no spaces.)
 
-### 4. Apply migrations
+### Frontend build (`VITE_API_URL`)
 
-**Local** (used by `wrangler dev` with Miniflare):
+Production builds **require `VITE_API_URL`** in the **build environment** (not committed): your Worker **origin only**, no path, no trailing slash.
 
-```bash
-cd api
-npm run db:apply:local
-# same as: npx wrangler d1 migrations apply rollerite_todos --local
-```
+**Cloudflare Pages:** **Settings → Environment variables** → add **`VITE_API_URL`** as a **Secret** (or variable), value = Worker URL, enabled for **Build** (and the environment you deploy, e.g. Production).
 
-**Remote** (Cloudflare-hosted D1):
+`npm run dev` does **not** need it — Vite proxies `/api` to the local Worker.
 
-```bash
-cd api
-npm run db:apply:remote
-# same as: npx wrangler d1 migrations apply rollerite_todos --remote
-```
-
-Add new SQL under **`db/migrations/`**, then run `apply` again. You can scaffold a numbered file from `api/`:
-
-```bash
-cd api
-npx wrangler d1 migrations create rollerite_todos "describe_change"
-```
-
-That writes into **`migrations_dir`** (`../db/migrations`). Edit the generated `.sql`, then run `db:apply:local` / `db:apply:remote`.
-
-### 5. Create / deploy the Worker
-
-There is no separate “create Worker” button for this repo: the Worker is defined by **`api/wrangler.toml`** (`name = "rollerite-todos-api"`). The first deploy **creates** that Worker (or updates it if it already exists).
-
-```bash
-cd api
-npm run deploy
-# same as: npx wrangler deploy
-```
-
-After deploy, the dashboard shows **Workers & Pages** → your worker name → **Triggers** (URL like `https://rollerite-todos-api.<subdomain>.workers.dev`).
-
-### 6. Variables and secrets
-
-| Item | Purpose | How to set |
-|------|---------|------------|
-| **`FRONTEND_ORIGIN`** | Browser origins allowed for **CORS** (comma-separated, no spaces). Example: `https://<project>.pages.dev,http://localhost:5173` | Plain text: [`api/wrangler.toml`](api/wrangler.toml) `[vars]`, or Worker → **Variables** / **Secrets** in the dashboard. |
-| **`VITE_API_URL`** (Pages **build**) | Worker origin baked into the SPA at build time | Pages → **Environment variables** → **Secrets** (recommended) named `VITE_API_URL`, scoped to **Build** (and the target environment). See §8. |
-| **Other Worker secrets** (optional) | API keys, etc. | `cd api` then `npx wrangler secret put MY_SECRET` and read `env.MY_SECRET` in `src/index.js`. |
-
-The Worker itself does not need a secret for basic todo CRUD; **`VITE_API_URL`** on Pages is the secret you configure so production builds succeed and the app calls your Worker instead of `pages.dev/api`.
-
-### 7. Optional: `wrangler dev --remote`
-
-To hit **remote** D1 while developing:
+### Optional: remote D1 while developing
 
 ```bash
 cd api
 npx wrangler dev --remote
 ```
 
-You may need a **`preview_database_id`** on the `[[d1_databases]]` block for preview DBs; see [D1 remote development](https://developers.cloudflare.com/d1/best-practices/local-development/).
-
-### 8. Point the frontend at the deployed Worker (`VITE_API_URL`)
-
-Production **`npm run build`** (including Cloudflare Pages) **fails unless `VITE_API_URL` is set** without using a one-off shell prefix. It must be your Worker’s **origin only** (no path, no trailing slash).
-
-**Cloudflare Pages (preferred)**
-
-1. Deploy the Worker from `api/` and copy its `*.workers.dev` origin.
-2. Pages → **Settings → Environment variables** → choose **Production** / **Preview** as needed.
-3. Add **`VITE_API_URL`** as a **Secret** (recommended) or variable, value = that origin.
-4. Enable it for **Build** so `npm run build` on Pages sees it.
-
-**Local production build** (e.g. testing `dist/` before upload)
-
-From `frontend/`, create **`.env.production`** (gitignored via `.env.*`) containing exactly:
-
-`VITE_API_URL=https://<your-worker>.workers.dev`
-
-Then run **`npm run build`** only — do not use `VAR=value npm run build`. (Vite may also read `.env`; prefer **`.env.production`** so the Worker URL is not mixed with dev settings.)
-
-`npm run dev` does **not** need `VITE_API_URL` (the dev server proxies `/api` to the local Worker).
-
-Set **`FRONTEND_ORIGIN`** on the Worker to wherever the browser loads the SPA (e.g. `https://<project>.pages.dev`), comma-separated if you have several origins, so CORS allows those origins when calling the Worker URL.
+See Cloudflare’s [D1 local development](https://developers.cloudflare.com/d1/best-practices/local-development/) if you need `preview_database_id`.
 
 ---
 
-## Local development (quick)
+## Local development
 
-### API (Worker + local D1)
+**API**
 
 ```bash
 cd api
@@ -161,15 +84,9 @@ npm run db:apply:local
 npm run dev
 ```
 
-Default: **http://127.0.0.1:8787**. If the port is busy:
+Default Worker URL: `http://127.0.0.1:8787`. Change port if busy; match [`frontend/vite.config.ts`](frontend/vite.config.ts) `server.proxy['/api'].target`.
 
-```bash
-npx wrangler dev --port 8788
-```
-
-Update [`frontend/vite.config.ts`](frontend/vite.config.ts) `server.proxy['/api'].target` to match.
-
-### Frontend
+**Frontend**
 
 ```bash
 cd frontend
@@ -177,13 +94,11 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. The Vite dev server **proxies** `/api/*` to the local Worker. You do not need `VITE_API_URL` for dev; use a Pages Secret or **`frontend/.env.production`** only when producing a production bundle.
+Open `http://localhost:5173`.
 
 ---
 
-## Smoke test (optional)
-
-With the Worker running:
+## Smoke test
 
 ```bash
 curl -s http://127.0.0.1:8787/api/todos
@@ -192,13 +107,11 @@ curl -s -X POST http://127.0.0.1:8787/api/todos -H 'Content-Type: application/js
 
 ---
 
-## Project layout
+## Layout
 
 | Path | Role |
 |------|------|
-| `frontend/` | Vite + React (TS) SPA |
-| `api/` | Worker entry (`src/index.js`), `wrangler.toml`, Wrangler scripts |
-| `db/migrations/` | D1 SQL migrations (referenced by `migrations_dir` in `api/wrangler.toml`) |
-| `reference/` | Visual reference (ignored from git) |
-
-The TypeScript HTTP client for `/api/todos` lives at **`frontend/src/api/todos.ts`** (not the same as the repo folder **`api/`**).
+| `frontend/` | Vite + React SPA; HTTP client in `src/api/todos.ts` |
+| `api/` | Worker, `wrangler.toml` |
+| `db/migrations/` | D1 SQL |
+| `reference/` | Visual reference (gitignored at repo root) |

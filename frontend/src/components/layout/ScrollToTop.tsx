@@ -1,9 +1,6 @@
 import { useLayoutEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
-/**
- * Scrolls to the top when the route pathname changes (full page navigations).
- */
 export function ScrollToTop() {
   const { pathname } = useLocation()
 

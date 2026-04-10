@@ -108,10 +108,11 @@ After deploy, the dashboard shows **Workers & Pages** → your worker name → *
 
 | Item | Purpose | How to set |
 |------|---------|------------|
-| **`FRONTEND_ORIGIN`** | Browser origins allowed for **CORS** (comma-separated, no spaces). Example: `https://app.example.com,http://localhost:5173` | Plain text: keep in [`api/wrangler.toml`](api/wrangler.toml) under `[vars]`, or override per environment in the [Cloudflare dashboard](https://dash.cloudflare.com/) → Worker → **Settings** → **Variables**. For sensitive values use **Secrets** instead. |
-| **Secrets** (optional) | API keys, tokens, etc. | `cd api` then `npx wrangler secret put MY_SECRET` and read `env.MY_SECRET` in `src/index.js`. Secrets are not stored in git. |
+| **`FRONTEND_ORIGIN`** | Browser origins allowed for **CORS** (comma-separated, no spaces). Example: `https://<project>.pages.dev,http://localhost:5173` | Plain text: [`api/wrangler.toml`](api/wrangler.toml) `[vars]`, or Worker → **Variables** / **Secrets** in the dashboard. |
+| **`VITE_API_URL`** (Pages **build**) | Worker origin baked into the SPA at build time | Pages → **Environment variables** → **Secrets** (recommended) named `VITE_API_URL`, scoped to **Build** (and the target environment). See §8. |
+| **Other Worker secrets** (optional) | API keys, etc. | `cd api` then `npx wrangler secret put MY_SECRET` and read `env.MY_SECRET` in `src/index.js`. |
 
-This template does not require any secrets for the todo CRUD + CORS flow. If you add auth later, put signing keys in **Secrets**, not `[vars]`.
+The Worker itself does not need a secret for basic todo CRUD; **`VITE_API_URL`** on Pages is the secret you configure so production builds succeed and the app calls your Worker instead of `pages.dev/api`.
 
 ### 7. Optional: `wrangler dev --remote`
 
@@ -124,16 +125,28 @@ npx wrangler dev --remote
 
 You may need a **`preview_database_id`** on the `[[d1_databases]]` block for preview DBs; see [D1 remote development](https://developers.cloudflare.com/d1/best-practices/local-development/).
 
-### 8. Point the frontend at the deployed Worker
+### 8. Point the frontend at the deployed Worker (`VITE_API_URL`)
 
-Build the SPA with the Worker’s public URL (no trailing slash):
+Production **`npm run build`** (including Cloudflare Pages) **fails unless `VITE_API_URL` is set** without using a one-off shell prefix. It must be your Worker’s **origin only** (no path, no trailing slash).
 
-```bash
-cd frontend
-VITE_API_URL=https://rollerite-todos-api.<your-subdomain>.workers.dev npm run build
-```
+**Cloudflare Pages (preferred)**
 
-Set **`FRONTEND_ORIGIN`** on the Worker to match wherever the browser loads the app (e.g. your Pages or static host origin), so CORS allows that origin.
+1. Deploy the Worker from `api/` and copy its `*.workers.dev` origin.
+2. Pages → **Settings → Environment variables** → choose **Production** / **Preview** as needed.
+3. Add **`VITE_API_URL`** as a **Secret** (recommended) or variable, value = that origin.
+4. Enable it for **Build** so `npm run build` on Pages sees it.
+
+**Local production build** (e.g. testing `dist/` before upload)
+
+From `frontend/`, create **`.env.production`** (gitignored via `.env.*`) containing exactly:
+
+`VITE_API_URL=https://<your-worker>.workers.dev`
+
+Then run **`npm run build`** only — do not use `VAR=value npm run build`. (Vite may also read `.env`; prefer **`.env.production`** so the Worker URL is not mixed with dev settings.)
+
+`npm run dev` does **not** need `VITE_API_URL` (the dev server proxies `/api` to the local Worker).
+
+Set **`FRONTEND_ORIGIN`** on the Worker to wherever the browser loads the SPA (e.g. `https://<project>.pages.dev`), comma-separated if you have several origins, so CORS allows those origins when calling the Worker URL.
 
 ---
 
@@ -164,7 +177,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. The Vite dev server **proxies** `/api/*` to the Worker, so the browser stays same-origin and CORS is not required for that path.
+Open **http://localhost:5173**. The Vite dev server **proxies** `/api/*` to the local Worker. You do not need `VITE_API_URL` for dev; use a Pages Secret or **`frontend/.env.production`** only when producing a production bundle.
 
 ---
 
